@@ -1,0 +1,31 @@
+---
+- name: install_docker
+  apt:
+    name:
+      - docker.io
+      - docker-compose
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: docker_start
+  service:
+    name: docker
+    state: started
+    enabled: yes
+
+- name: copy_docker-compose.yml
+  copy:
+    src: /vagrant/docker-compose.yml
+    dest: /home/vagrant/docker-compose.yml
+
+- name: copy_nginx.conf
+  copy:
+    src: /vagrant/nginx.conf
+    dest: /home/vagrant/nginx.conf
+
+- name: start_service
+  command: docker-compose up -d
+  args:
+    chdir: /home/vagrant
+  become: yes

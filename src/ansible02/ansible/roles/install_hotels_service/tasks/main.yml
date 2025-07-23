@@ -1,0 +1,33 @@
+---
+- name: Install OpenJDK 8
+  apt:
+    name: openjdk-8-jdk
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Copy hotels_service source
+  copy:
+    src: hotel-service/
+    dest: /opt/hotels_service/
+    owner: vagrant
+    group: vagrant
+    mode: 0755
+  become: yes
+
+- name: Copy systemd unit file for hotels_service
+  template:
+    src: hotels_service.service.j2
+    dest: /etc/systemd/system/hotels_service.service
+  become: yes
+
+- name: Reload systemd
+  command: systemctl daemon-reexec
+  become: yes
+
+- name: Enable and start hotels_service
+  systemd:
+    name: hotels_service
+    enabled: yes
+    state: started
+  become: yes

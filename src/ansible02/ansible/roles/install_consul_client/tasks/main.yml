@@ -1,0 +1,153 @@
+---
+- name: Install dependencies
+  apt:
+    name:
+      - unzip
+      - curl
+      - software-properties-common
+      - wget
+      - ca-certificates
+      - apt-transport-https
+      - gnupg2
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Download Consul binary
+  get_url:
+    url: https://mirror.selectel.ru/3rd-party/hashicorp-releases/consul/1.21.0-rc1/consul_1.21.0-rc1_linux_amd64.zip
+    dest: /tmp/consul.zip
+  become: yes
+
+- name: Unzip Consul binary
+  unarchive:
+    src: /tmp/consul.zip
+    dest: /usr/local/bin/
+    remote_src: yes
+  become: yes
+
+- name: Create Consul user and directories
+  block:
+    - name: Add consul user
+      user:
+        name: consul
+        shell: /bin/false
+  become: yes
+
+- name: Create data and config dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0755'
+  loop:
+    - /etc/consul.d
+    - /opt/consul
+  become: yes
+
+- name: Copy consul_client.hcl
+  copy:
+    src: consul_client.hcl
+    dest: /etc/consul.d/consul.hcl
+    owner: consul
+    group: consul
+    mode: '0644'
+  become: yes
+
+- name: Copy Consul service definition (postgres)
+  copy:
+    src: postgres-service.json
+    dest: /etc/consul.d/postgres-service.json
+    owner: consul
+    group: consul
+    mode: '0644'
+  become: yes
+  when: "'db' in group_names"
+
+- name: Copy Consul service definition (hotels_service)
+  copy:
+    src: hotels_service.json
+    dest: /etc/consul.d/hotels_service.json
+    owner: consul
+    group: consul
+    mode: '0644'
+  become: yes
+  when: "'api' in group_names"
+
+- name: Create systemd unit file for Consul
+  copy:
+    dest: /etc/systemd/system/consul.service
+    content: |
+      [Unit]
+      Description=Consul Agent
+      Requires=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=consul
+      Group=consul
+      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+      ExecReload=/bin/kill -HUP $MAINPID
+      KillMode=process
+      Restart=on-failure
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Restart Consul
+  become: yes
+
+- name: Download signing key for Envoy
+  become: yes
+  shell: |
+        if [ ! -f /etc/apt/keyrings/envoy-keyring.gpg ]; then
+          wget -O- https://apt.envoyproxy.io/signing.key | sudo gpg --dearmor -o /etc/apt/keyrings/envoy-keyring.gpg;
+        fi
+  args:
+    warn: false
+
+- name: Add Envoy repository
+  shell: echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/envoy-keyring.gpg] https://apt.envoyproxy.io focal main" | sudo tee /etc/apt/sources.list.d/envoy.list
+  args:
+    warn: false
+  register: result_add_repo
+
+- name: Update apt cache
+  become: yes
+  apt:
+    update_cache: yes
+
+- name: Install Envoy
+  become: yes
+  apt:
+    name: envoy
+    state: present
+
+- name: Create Envoy systemd unit (for db)
+  template:
+    src: envoy-db.service.j2
+    dest: /etc/systemd/system/envoy.service
+  when: "'db' in group_names"
+  become: yes
+
+- name: Create Envoy systemd unit (for api)
+  template:
+    src: envoy-api.service.j2
+    dest: /etc/systemd/system/envoy.service
+  when: "'api' in group_names"
+  become: yes
+
+- name: Reload systemd
+  become: yes
+  command: systemctl daemon-reload
+
+- name: Enable and start services
+  become: yes
+  systemd:
+    name: "{{ item }}"
+    state: started
+    enabled: yes
+  loop:
+    - consul
+    - envoy

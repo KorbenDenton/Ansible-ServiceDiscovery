@@ -1,0 +1,9 @@
+{
+  "service": {
+    "name": "postgres",
+    "port": 5432,
+    "connect": {
+      "sidecar_service": {}
+    }
+  }
+}

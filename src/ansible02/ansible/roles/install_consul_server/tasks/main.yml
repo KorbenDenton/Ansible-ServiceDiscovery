@@ -1,0 +1,81 @@
+---
+- name: Install dependencies
+  apt:
+    name:
+      - unzip
+      - curl
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: Download Consul binary
+  get_url:
+    url: https://mirror.selectel.ru/3rd-party/hashicorp-releases/consul/1.21.0-rc1/consul_1.21.0-rc1_linux_amd64.zip
+    dest: /tmp/consul.zip
+  become: yes
+
+- name: Unzip Consul binary
+  unarchive:
+    src: /tmp/consul.zip
+    dest: /usr/local/bin/
+    remote_src: yes
+  become: yes
+
+- name: Create Consul user and directories
+  block:
+    - name: Add consul user
+      user:
+        name: consul
+        shell: /bin/false
+  become: yes
+
+- name: Create data and config dirs
+  file:
+    path: "{{ item }}"
+    state: directory
+    owner: consul
+    group: consul
+    mode: '0755'
+  loop:
+    - /etc/consul.d
+    - /opt/consul
+  become: yes
+
+- name: Copy consul_server.hcl
+  copy:
+    src: consul_server.hcl
+    dest: /etc/consul.d/consul.hcl
+    owner: consul
+    group: consul
+    mode: '0644'
+  become: yes
+
+- name: Create systemd unit file for Consul
+  copy:
+    dest: /etc/systemd/system/consul.service
+    content: |
+      [Unit]
+      Description=Consul Agent
+      Requires=network-online.target
+      After=network-online.target
+
+      [Service]
+      User=consul
+      Group=consul
+      ExecStart=/usr/local/bin/consul agent -config-dir=/etc/consul.d
+      ExecReload=/bin/kill -HUP $MAINPID
+      KillMode=process
+      Restart=on-failure
+      LimitNOFILE=65536
+
+      [Install]
+      WantedBy=multi-user.target
+  notify: Restart Consul
+  become: yes
+
+- name: Enable and start Consul service
+  systemd:
+    name: consul
+    enabled: yes
+    state: started
+  become: yes

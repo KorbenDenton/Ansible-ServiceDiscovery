@@ -1,0 +1,23 @@
+---
+- name: install_apache
+  apt:
+    name: apache2
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: apache_start
+  service:
+    name: apache2
+    state: started
+    enabled: yes
+  become: yes
+
+- name: test_webpage
+  copy:
+    content: "<html><body><h1>Hello from Apache!</h1></body></html>"
+    dest: /var/www/html/index.html
+    owner: www-data
+    group: www-data
+    mode: '0644'
+  become: yes

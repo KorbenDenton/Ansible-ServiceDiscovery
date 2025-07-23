@@ -1,0 +1,28 @@
+---
+- name: Install PostgreSQL
+  become: yes
+  apt:
+    name: postgresql
+    state: present
+    update_cache: yes
+  notify: Restart PostgreSQL
+
+- name: Ensure PostgreSQL is started
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+  become: yes
+
+- name: Copy init.sql to the server
+  copy:
+    src: init.sql
+    dest: /tmp/init.sql
+    owner: postgres
+    group: postgres
+    mode: '0644'
+  become: yes
+
+- name: Run init.sql to create DB and tables
+  become: yes
+  shell: sudo -u postgres psql -f /tmp/init.sql

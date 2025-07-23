@@ -1,0 +1,27 @@
+{
+        "service": {
+          "name": "hotels_service",
+          "port": 8082,
+          "connect": {
+            "sidecar_service": {
+              "proxy": {
+                "upstreams": [
+                  {
+                    "destination_name": "postgres",
+                    "local_bind_port": 5432
+                  }
+                ]
+              }
+            }
+          },
+          "checks": [
+            {
+              "id": "hotels_service_http_check",
+              "name": "Hotels Service HTTP Health Check",
+              "http": "http://localhost:8082/health",
+              "interval": "10s",
+              "timeout": "1s"
+            }
+          ]
+        }
+}

@@ -1,0 +1,10 @@
+---
+- name: Restart Consul
+  systemd:
+    name: consul
+    state: restarted
+
+- name: Restart Envoy
+  systemd:
+    name: envoy
+    state: restarted

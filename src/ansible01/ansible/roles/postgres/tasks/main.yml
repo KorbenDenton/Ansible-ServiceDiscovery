@@ -1,0 +1,23 @@
+---
+- name: install_postgres
+  apt:
+    name: postgresql
+    state: present
+    update_cache: yes
+  become: yes
+
+- name: start_postgres
+  service:
+    name: postgresql
+    state: started
+    enabled: yes
+  become: yes
+
+- name: create_db
+  become: yes
+  shell: |
+    sudo -u postgres psql -c "CREATE DATABASE my_db;"
+    sudo -u postgres psql -d my_db -c "CREATE TABLE IF NOT EXISTS users (id SERIAL PRIMARY KEY, name TEXT);"
+    sudo -u postgres psql -d my_db -c "INSERT INTO users (name) VALUES ('Rampage'), ('Rumble'), ('Iceman');"
+  args:
+    executable: /bin/bash
